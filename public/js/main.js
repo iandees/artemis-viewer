@@ -582,7 +582,7 @@ function updateScene() {
   elTimeLabel.textContent = timeStr;
   const met = displayTime.getTime() - LAUNCH_TIME.getTime();
   elMetLabel.textContent = `MET: ${formatMET(met)}`;
-  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatPlaybackSpeed();
+  elSpeedDisplay.textContent = liveMode ? '' : formatPlaybackSpeed();
   document.title = `MET ${formatMET(met)} | Alt ${formatDist(altitudeKm)}`;
 
   // Update extended telemetry HUD
@@ -657,9 +657,7 @@ function updateLiveTime() {
     elLiveStatus.textContent = 'Mission tracking data ended';
   } else {
     currentTime = wallNow;
-    elLiveStatus.textContent = liveTelemetry
-      ? 'Receiving live NASA telemetry'
-      : 'Waiting for telemetry...';
+    elLiveStatus.textContent = '';
   }
 }
 
@@ -721,7 +719,7 @@ function formatPlaybackSpeed() {
   return `${speedMultiplier}x`;
 }
 function updateSpeedDisplay() {
-  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatPlaybackSpeed();
+  elSpeedDisplay.textContent = liveMode ? '' : formatPlaybackSpeed();
 }
 updateSpeedDisplay();
 

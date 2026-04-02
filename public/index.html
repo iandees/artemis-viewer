@@ -58,12 +58,13 @@
     #timeline {
       flex: 1; -webkit-appearance: none; appearance: none;
       height: 4px; background: rgba(100, 140, 255, 0.2); border-radius: 2px; cursor: pointer;
+      margin: 10px 0;
     }
     #timeline::-webkit-slider-thumb {
       -webkit-appearance: none; width: 14px; height: 14px;
       background: #5599ff; border-radius: 50%; cursor: grab;
     }
-    #btn-row { display: flex; gap: 8px; align-items: center; }
+    #btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
     .btn {
       background: rgba(80, 130, 255, 0.15); border: 1px solid rgba(100, 140, 255, 0.3);
       color: #aaccff; border-radius: 4px; padding: 5px 14px; cursor: pointer; font-size: 12px;
@@ -72,7 +73,7 @@
     .btn.active { background: rgba(80, 130, 255, 0.4); border-color: #5599ff; color: #fff; }
     #speed-display { font-size: 12px; color: #6688aa; margin-left: 8px; }
 
-    #focus-btns { display: flex; gap: 6px; margin-left: auto; }
+    #focus-btns { display: flex; gap: 6px; }
 
     #loading {
       position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -88,7 +89,8 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    #live-status-row { min-height: 18px; margin-bottom: 4px; }
+    #live-status-row { margin-bottom: 4px; }
+    #live-status-row:has(#live-status:empty) { display: none; }
     #live-status { font-size: 12px; color: #ffaa44; }
 
     .live-dot {
@@ -146,6 +148,36 @@
     #about-content h2 { font-size: 15px; color: #7eb8ff; margin-bottom: 12px; }
     #about-content a { color: #5599ff; text-decoration: none; }
     #about-content a:hover { text-decoration: underline; }
+
+    /* Info panel collapse toggle */
+    #info-toggle {
+      display: none; /* shown on mobile via media query */
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(10, 15, 30, 0.85); border: 1px solid rgba(100, 140, 255, 0.3);
+      border-radius: 6px; padding: 8px 12px; color: #7eb8ff; font-size: 13px;
+      cursor: pointer; pointer-events: auto; backdrop-filter: blur(10px); z-index: 10;
+    }
+    #info-panel.collapsed { display: none; }
+
+    /* Mobile styles */
+    @media (max-width: 768px) {
+      #info-toggle { display: block; }
+      #info-panel { font-size: 12px; min-width: auto; max-width: calc(100vw - 40px); }
+      #info-panel h1 { font-size: 14px; margin-bottom: 8px; }
+      .stat { font-size: 11px; margin-bottom: 4px; }
+      #hud { padding: 10px; }
+
+      #controls-panel { padding: 10px 12px; }
+      #timeline-row { flex-wrap: wrap; gap: 4px; }
+      #time-label { font-size: 11px; min-width: auto; }
+      #met-label { font-size: 10px; }
+      #timeline { flex: 1 1 100%; order: 3; }
+      #btn-row { gap: 4px; }
+      .btn { padding: 4px 8px; font-size: 10px; }
+      #speed-display { font-size: 10px; }
+      #live-status-row { min-height: 14px; }
+      #live-status { font-size: 11px; }
+    }
   </style>
 </head>
 <body>
@@ -157,9 +189,14 @@
     <div id="loading-status">Fetching trajectory data from JPL Horizons...</div>
   </div>
 
+  <div id="info-toggle" onclick="toggleInfoPanel()">&#9776; Info</div>
+
   <div id="hud">
     <div id="info-panel">
-      <h1>ARTEMIS II &mdash; ORION</h1>
+      <h1 style="cursor:pointer; display:flex; justify-content:space-between; align-items:center" onclick="toggleInfoPanel()">
+        <span>ARTEMIS II &mdash; ORION</span>
+        <span style="font-size:18px; font-weight:300; opacity:0.5">&times;</span>
+      </h1>
       <div class="stat"><span class="stat-label">Distance from Earth</span><span class="stat-value" id="dist-earth">&mdash;</span></div>
       <div class="stat"><span class="stat-label">Distance from Moon</span><span class="stat-value" id="dist-moon">&mdash;</span></div>
       <div class="stat"><span class="stat-label">Velocity</span><span class="stat-value" id="velocity">&mdash;</span></div>
@@ -217,6 +254,7 @@
       <button class="btn" id="btn-slower">&laquo;</button>
       <button class="btn" id="btn-faster">&raquo;</button>
       <span id="speed-display">1x</span>
+      <span style="color:rgba(100,140,255,0.3); margin:0 4px">|</span>
       <div id="focus-btns">
         <button class="btn" id="focus-earth">Earth</button>
         <button class="btn active" id="focus-orion">Orion</button>
@@ -255,6 +293,20 @@
     </div>
   </div>
 
+  <script>
+    function toggleInfoPanel() {
+      const panel = document.getElementById('info-panel');
+      const toggle = document.getElementById('info-toggle');
+      const collapsed = panel.classList.toggle('collapsed');
+      toggle.style.display = collapsed ? 'block' : 'none';
+    }
+    // Auto-collapse on mobile
+    if (window.innerWidth <= 768) {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('info-panel').classList.add('collapsed');
+      });
+    }
+  </script>
   <script type="importmap">
     {
       "imports": {
