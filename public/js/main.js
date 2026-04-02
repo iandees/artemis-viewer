@@ -392,6 +392,7 @@ async function init() {
 
     buildTrajectoryLines();
     createStarfield();
+    frameCamera();
     elLoading.style.display = 'none';
     lastRealTime = performance.now();
     if (liveMode) pollTelemetry();
@@ -400,6 +401,52 @@ async function init() {
     elLoadingStatus.textContent = `Error: ${err.message}`;
     console.error(err);
   }
+}
+
+function frameCamera() {
+  // Position camera so Orion is in foreground with the nearest body fully visible behind it
+  const orionState = interpolate(data.orion, currentTime);
+  const moonState = interpolate(data.moon, currentTime);
+
+  const orionPos = toScene(orionState);
+  const moonPos = toScene(moonState);
+  const earthPos = new THREE.Vector3(0, 0, 0);
+
+  const distEarthKm = Math.sqrt(orionState.x ** 2 + orionState.y ** 2 + orionState.z ** 2);
+  const distMoonKm = Math.sqrt(
+    (orionState.x - moonState.x) ** 2 +
+    (orionState.y - moonState.y) ** 2 +
+    (orionState.z - moonState.z) ** 2
+  );
+
+  const nearEarth = distEarthKm < distMoonKm;
+  const bgBody = nearEarth ? earthPos : moonPos;
+  const bodyRadiusScene = nearEarth ? EARTH_RADIUS : MOON_RADIUS;
+  const distToBodyScene = (nearEarth ? distEarthKm : distMoonKm) * SCALE;
+
+  // We want the body to fill ~40% of the vertical FOV
+  const fovRad = camera.fov * Math.PI / 180;
+  const desiredAngularSize = fovRad * 0.4;
+  // Distance from body where it subtends that angle: r / tan(angle/2)
+  const camDistFromBody = bodyRadiusScene / Math.tan(desiredAngularSize / 2);
+
+  // Direction from body to Orion
+  const bodyToOrion = new THREE.Vector3().subVectors(orionPos, bgBody).normalize();
+
+  // Place camera along the body→Orion line, past Orion
+  const up = new THREE.Vector3(0, 1, 0);
+  const side = new THREE.Vector3().crossVectors(bodyToOrion, up).normalize();
+  const camUp = new THREE.Vector3().crossVectors(side, bodyToOrion).normalize();
+
+  // Camera position: along the body-to-Orion axis at the computed distance, offset slightly up and right
+  camera.position.copy(bgBody)
+    .addScaledVector(bodyToOrion, camDistFromBody)
+    .addScaledVector(camUp, camDistFromBody * 0.05)
+    .addScaledVector(side, camDistFromBody * 0.03);
+
+  // Look at the body center so it's fully framed
+  controls.target.copy(bgBody);
+  controls.update();
 }
 
 function buildTrajectoryLines() {
