@@ -117,17 +117,6 @@
       pointer-events: none; z-index: 50;
     }
 
-    #shortcuts-modal {
-      display: none; position: fixed; inset: 0; z-index: 200;
-      background: rgba(0, 0, 0, 0.7); align-items: center; justify-content: center;
-    }
-    #shortcuts-modal.open { display: flex; }
-    #shortcuts-content {
-      background: rgba(10, 15, 30, 0.95); border: 1px solid rgba(100, 140, 255, 0.3);
-      border-radius: 10px; padding: 24px 32px; backdrop-filter: blur(10px);
-      max-width: 400px; width: 90%;
-    }
-    #shortcuts-content h2 { font-size: 15px; color: #7eb8ff; margin-bottom: 16px; }
     .shortcut-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
     .shortcut-key {
       background: rgba(80, 130, 255, 0.15); border: 1px solid rgba(100, 140, 255, 0.3);
@@ -135,12 +124,16 @@
     }
     .shortcut-desc { color: #8899bb; }
 
+    .settings-toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: #8899bb; }
+    .settings-toggle-row .btn { padding: 3px 12px; font-size: 11px; }
+
     #about-modal {
       display: none; position: fixed; inset: 0; z-index: 200;
       background: rgba(0, 0, 0, 0.7); align-items: center; justify-content: center;
     }
     #about-modal.open { display: flex; }
     #about-content {
+      position: relative;
       background: rgba(10, 15, 30, 0.95); border: 1px solid rgba(100, 140, 255, 0.3);
       border-radius: 10px; padding: 24px 32px; backdrop-filter: blur(10px);
       max-width: 440px; width: 90%; font-size: 13px; line-height: 1.6; color: #8899bb;
@@ -177,6 +170,7 @@
       #speed-display { font-size: 10px; }
       #live-status-row { min-height: 14px; }
       #live-status { font-size: 11px; }
+      #shortcuts-section { display: none; }
     }
   </style>
 </head>
@@ -234,7 +228,7 @@
         <div class="stat"><span class="stat-label">Status flag</span><span class="stat-value telemetry-na" id="status-flag">&mdash;</span></div>
         <div class="stat"><span class="stat-label">Altitude (telem)</span><span class="stat-value telemetry-na" id="telem-alt">&mdash;</span></div>
       </div>
-      <div id="about-link"><button id="btn-about">About this project</button> &middot; <span class="shortcut-key" style="font-size:10px; cursor:pointer" onclick="document.getElementById('shortcuts-modal').classList.add('open')">?</span></div>
+      <div id="about-link"><button id="btn-about">Settings &amp; About</button></div>
     </div>
   </div>
 
@@ -265,28 +259,37 @@
 
   <div id="about-modal">
     <div id="about-content">
-      <h2>Artemis II Trajectory Viewer</h2>
+      <span id="about-close" onclick="document.getElementById('about-modal').classList.remove('open')" style="position:absolute; top:12px; right:16px; font-size:20px; color:#5580aa; cursor:pointer; font-weight:300; line-height:1">&times;</span>
+      <h2>Settings</h2>
+      <div class="settings-toggle-row">
+        <span>Units</span>
+        <button class="btn" id="btn-units">km</button>
+      </div>
+      <div class="settings-toggle-row">
+        <span>Time zone</span>
+        <button class="btn" id="btn-tz">UTC</button>
+      </div>
+
+      <div id="shortcuts-section">
+        <h2 style="margin-top:16px">Keyboard Shortcuts</h2>
+        <div class="shortcut-row"><span class="shortcut-desc">Play / Pause</span><span class="shortcut-key">Space</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Toggle live mode</span><span class="shortcut-key">L</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Slower playback</span><span class="shortcut-key">&larr;</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Faster playback</span><span class="shortcut-key">&rarr;</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Focus Earth</span><span class="shortcut-key">1</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Focus Orion</span><span class="shortcut-key">2</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Focus Moon</span><span class="shortcut-key">3</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Free camera</span><span class="shortcut-key">4</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Toggle imperial / metric</span><span class="shortcut-key">U</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Toggle local / UTC time</span><span class="shortcut-key">T</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Settings &amp; About</span><span class="shortcut-key">?</span></div>
+      </div>
+
+      <h2 style="margin-top:16px">About</h2>
       <p>A real-time 3D visualization of NASA's Artemis II mission, the first crewed flight to the Moon in over 50 years.</p>
       <p style="margin-top:10px">Orion's position is tracked using live telemetry from NASA's <a href="https://www.nasa.gov/missions/artemis-ii/arow/" target="_blank">AROW</a> system. The predicted trajectory comes from <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank">JPL Horizons</a> ephemeris data. Stars are from the <a href="https://github.com/astronexus/HYG-Database" target="_blank">HYG catalog</a>.</p>
-      <p style="margin-top:10px">Press <span class="shortcut-key">?</span> for keyboard shortcuts.</p>
+      <p style="margin-top:10px; font-size:11px; color:#6688aa">Note: Solar panel orientation on the 3D model is approximate and may not reflect the actual spacecraft configuration.</p>
       <p style="margin-top:14px"><a href="https://github.com/iandees/artemis-viewer" target="_blank">View source on GitHub</a></p>
-    </div>
-  </div>
-
-  <div id="shortcuts-modal">
-    <div id="shortcuts-content">
-      <h2>Keyboard Shortcuts</h2>
-      <div class="shortcut-row"><span class="shortcut-desc">Play / Pause</span><span class="shortcut-key">Space</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Toggle live mode</span><span class="shortcut-key">L</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Slower playback</span><span class="shortcut-key">&larr;</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Faster playback</span><span class="shortcut-key">&rarr;</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Focus Earth</span><span class="shortcut-key">1</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Focus Orion</span><span class="shortcut-key">2</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Focus Moon</span><span class="shortcut-key">3</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Free camera</span><span class="shortcut-key">4</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Toggle imperial / metric</span><span class="shortcut-key">U</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Toggle local / UTC time</span><span class="shortcut-key">T</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Show this help</span><span class="shortcut-key">?</span></div>
     </div>
   </div>
 

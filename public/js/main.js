@@ -784,6 +784,18 @@ elTimeline.addEventListener('input', () => {
   });
 });
 
+// Units and timezone toggles
+const btnUnits = document.getElementById('btn-units');
+const btnTz = document.getElementById('btn-tz');
+btnUnits.addEventListener('click', () => {
+  useImperial = !useImperial;
+  btnUnits.textContent = useImperial ? 'mi' : 'km';
+});
+btnTz.addEventListener('click', () => {
+  useLocalTime = !useLocalTime;
+  btnTz.textContent = useLocalTime ? 'Local' : 'UTC';
+});
+
 // Resize
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -801,18 +813,15 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '3') document.getElementById('focus-moon').click();
   if (e.key === '4') document.getElementById('focus-free').click();
   if (e.key === 'l' || e.key === 'L') document.getElementById('btn-live').click();
-  if (e.key === 'u' || e.key === 'U') useImperial = !useImperial;
-  if (e.key === 't' || e.key === 'T') useLocalTime = !useLocalTime;
+  if (e.key === 'u' || e.key === 'U') document.getElementById('btn-units').click();
+  if (e.key === 't' || e.key === 'T') document.getElementById('btn-tz').click();
   if (e.key === '?') {
-    const modal = document.getElementById('shortcuts-modal');
+    const modal = document.getElementById('about-modal');
     modal.classList.toggle('open');
   }
 });
 
 // --- Modals ---
-document.getElementById('shortcuts-modal').addEventListener('click', (e) => {
-  if (e.target.id === 'shortcuts-modal') e.target.classList.remove('open');
-});
 document.getElementById('about-modal').addEventListener('click', (e) => {
   if (e.target.id === 'about-modal') e.target.classList.remove('open');
 });
