@@ -613,7 +613,6 @@ function updateScene() {
   elVelocity.textContent = formatSpeed(speed);
   elAltitude.textContent = formatDist(altitudeKm);
   elDataSource.textContent = usedLive ? 'NASA AROW (live)' : 'JPL Horizons';
-  document.getElementById('trajectory-note').style.display = usedLive ? 'block' : 'none';
   elDataSource.style.color = usedLive ? '#44ff88' : '#ddeeff';
   if (usedLive && liveTelemetry?.date) {
     const ageSec = Math.round((Date.now() - liveTelemetry.date.getTime()) / 1000);
