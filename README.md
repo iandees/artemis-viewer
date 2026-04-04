@@ -34,6 +34,8 @@ The site is deployed at [artemistracker.mapki.com](https://artemistracker.mapki.
 | 1/2/3/4 | Focus Earth/Orion/Moon/Free camera |
 | U | Toggle imperial/metric units |
 | T | Toggle local/UTC time |
+| N | Jump to next milestone |
+| P | Jump to previous milestone |
 | ? | Show keyboard shortcuts |
 
 ## Architecture
@@ -44,6 +46,7 @@ public/                  # Static assets (served by Cloudflare Workers)
   js/
     main.js              # Three.js scene, animation loop, HUD, controls
     horizons.js          # Data loading and interpolation
+    milestones.js        # Mission milestones, phases, and timeline helpers
   data/
     orion.json           # Orion trajectory (1,279 points, 10-min intervals)
     moon.json            # Moon ephemeris (same cadence)
@@ -147,6 +150,17 @@ The official AROW website (nasa.gov/missions/artemis-ii/arow/) uses a Unity WebG
 | 5010–5013 | Timestamps | Unix-like |
 
 Parameters 2048–2065 appear to describe the four solar array wings (SAW1–4), with each wing having multiple values that likely correspond to gimbal angles and deployment state. Parameters 2091–2098 appear to be RCS jet gimbal angles (4 pairs near ±π).
+
+### Mission Timeline (milestones and phases)
+
+Mission milestone times come from two official NASA sources:
+
+- **Past events (Launch through TLI):** Actual times from NASA Artemis II mission blog posts
+  - [Launch day updates](https://www.nasa.gov/blogs/missions/2026/04/01/live-artemis-ii-launch-day-updates/)
+  - [Flight Day 2 / TLI](https://www.nasa.gov/blogs/missions/2026/04/02/artemis-ii-flight-day-2-orion-completes-tli-burn-crew-begins-journey-to-the-moon/)
+- **Future events (OTC-1 through Splashdown):** Planned times from the [NASA Artemis II Press Kit](https://www.nasa.gov/wp-content/uploads/2026/01/artemis-ii-press-kit.pdf), pages 13-15
+
+Mission phase boundaries (LEO, Trans-Lunar Coast, Lunar Flyby, Trans-Earth Coast, Entry & Splashdown) are derived from these milestone times.
 
 ### Coordinate Systems
 

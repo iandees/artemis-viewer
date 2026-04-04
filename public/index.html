@@ -53,12 +53,17 @@
       backdrop-filter: blur(10px);
     }
     #timeline-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-    #time-label { font-size: 13px; color: #7eb8ff; min-width: 200px; }
-    #met-label { font-size: 12px; color: #6688aa; }
+    #time-stack { display: flex; align-items: baseline; gap: 12px; flex-shrink: 0; }
+    #time-label { font-size: 13px; color: #7eb8ff; white-space: nowrap; }
+    #met-label { font-size: 12px; color: #6688aa; white-space: nowrap; }
+    #phase-stack { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; width: 200px; flex-shrink: 0; justify-content: flex-end; text-align: right; }
+    #timeline-track {
+      flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative;
+    }
     #timeline {
-      flex: 1; -webkit-appearance: none; appearance: none;
-      height: 4px; background: rgba(100, 140, 255, 0.2); border-radius: 2px; cursor: pointer;
-      margin: 10px 0;
+      width: 100%; -webkit-appearance: none; appearance: none;
+      height: 4px; background: transparent; border-radius: 2px; cursor: pointer;
+      margin: 2px 0; position: relative; z-index: 2;
     }
     #timeline::-webkit-slider-thumb {
       -webkit-appearance: none; width: 14px; height: 14px;
@@ -73,7 +78,7 @@
     .btn.active { background: rgba(80, 130, 255, 0.4); border-color: #5599ff; color: #fff; }
     #speed-display { font-size: 12px; color: #6688aa; margin-left: 8px; }
 
-    #focus-btns { display: flex; gap: 6px; }
+    #focus-btns { display: flex; gap: 6px; flex-shrink: 0; }
 
     #loading {
       position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -162,16 +167,74 @@
 
       #controls-panel { padding: 10px 12px; }
       #timeline-row { flex-wrap: wrap; gap: 4px; }
-      #time-label { font-size: 11px; min-width: auto; }
+      #time-stack { flex-direction: column; gap: 0; width: auto; flex-shrink: 1; }
+      #time-label { font-size: 11px; }
       #met-label { font-size: 10px; }
-      #timeline { flex: 1 1 100%; order: 3; }
-      #btn-row { gap: 4px; }
-      .btn { padding: 4px 8px; font-size: 10px; }
-      #speed-display { font-size: 10px; }
+      #phase-stack { flex-direction: column; gap: 0; width: auto; flex-shrink: 1; align-items: flex-end; margin-left: auto; white-space: normal; }
+      #timeline-track { flex: 1 1 100%; order: 3; }
+      #btn-row { gap: 4px; overflow: hidden; }
+      .btn { padding: 4px 8px; font-size: 10px; flex-shrink: 0; }
+      #speed-display { font-size: 10px; min-width: 24px; }
       #live-status-row { min-height: 14px; }
       #live-status { font-size: 11px; }
       #shortcuts-section { display: none; }
+      #phase-bar-container { height: 4px; }
+      #milestone-ticks { height: 8px; }
+      .milestone-tick { height: 8px; }
+      .milestone-tick-label { font-size: 10px; padding: 3px 6px; }
+      #event-badge { font-size: 10px; margin-left: 0; text-align: right; }
+      #phase-label { font-size: 9px; margin-left: 0; text-align: right; }
+      #event-jump, .btn-row-sep { display: none; }
     }
+
+    /* Phase bar behind timeline scrubber */
+    #phase-bar-container {
+      position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+      height: 4px; border-radius: 2px; overflow: hidden; z-index: 1;
+      background: rgba(100, 140, 255, 0.1);
+    }
+    .phase-segment {
+      position: absolute; top: 0; height: 100%; opacity: 0.6;
+    }
+    .phase-segment:first-child { border-radius: 3px 0 0 3px; }
+    .phase-segment:last-child { border-radius: 0 3px 3px 0; }
+
+    /* Milestone ticks on timeline */
+    #milestone-ticks {
+      position: relative; height: 10px;
+    }
+    .milestone-tick {
+      position: absolute; top: 0; width: 2px; height: 10px;
+      background: rgba(255, 255, 255, 0.5); border-radius: 1px;
+      transform: translateX(-1px); cursor: pointer;
+    }
+    .milestone-tick:hover { background: #fff; }
+    .milestone-tick-label {
+      display: none; position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(10, 15, 30, 0.95); border: 1px solid rgba(100, 140, 255, 0.4);
+      border-radius: 4px; padding: 4px 8px; font-size: 11px; color: #ddeeff;
+      white-space: nowrap; pointer-events: none; z-index: 20;
+    }
+    .milestone-tick:hover .milestone-tick-label { display: block; }
+
+    /* Current event badge */
+    #event-badge {
+      font-size: 12px; color: #ffcc44; margin-left: 12px; white-space: nowrap;
+    }
+    #event-badge:empty::before { content: '\00a0'; } /* reserve line height when empty */
+
+    /* Phase label in controls */
+    #phase-label {
+      font-size: 11px; color: #6688aa; white-space: nowrap;
+    }
+
+    /* Event jump dropdown */
+    #event-jump {
+      background: rgba(80, 130, 255, 0.15); border: 1px solid rgba(100, 140, 255, 0.3);
+      color: #aaccff; border-radius: 4px; padding: 4px 8px; font-size: 12px;
+      cursor: pointer; font-family: inherit;
+    }
+    #event-jump option { background: #0a0f1e; color: #ddeeff; }
   </style>
 </head>
 <body>
@@ -235,9 +298,19 @@
   <div id="controls-panel">
     <div id="live-status-row"><span id="live-status"></span></div>
     <div id="timeline-row">
-      <span id="time-label">--</span>
-      <input type="range" id="timeline" min="0" max="1000" value="0">
-      <span id="met-label">MET: --</span>
+      <div id="time-stack">
+        <span id="time-label">--</span>
+        <span id="met-label">MET: --</span>
+      </div>
+      <div id="timeline-track">
+        <div id="phase-bar-container"></div>
+        <input type="range" id="timeline" min="0" max="1000" value="0">
+        <div id="milestone-ticks"></div>
+      </div>
+      <div id="phase-stack">
+        <span id="phase-label"></span>
+        <span id="event-badge"></span>
+      </div>
     </div>
     <div id="btn-row">
       <button class="btn" id="btn-live"><span class="live-dot"></span>LIVE</button>
@@ -245,7 +318,9 @@
       <button class="btn" id="btn-slower">&laquo;</button>
       <button class="btn" id="btn-faster">&raquo;</button>
       <span id="speed-display">1x</span>
-      <span style="color:rgba(100,140,255,0.3); margin:0 4px">|</span>
+      <span class="btn-row-sep" style="color:rgba(100,140,255,0.3); margin:0 4px">|</span>
+      <select id="event-jump" title="Jump to event"><option value="">Jump to...</option></select>
+      <span class="btn-row-sep" style="color:rgba(100,140,255,0.3); margin:0 4px">|</span>
       <div id="focus-btns">
         <button class="btn" id="focus-earth">Earth</button>
         <button class="btn active" id="focus-orion">Orion</button>
@@ -283,6 +358,8 @@
         <div class="shortcut-row"><span class="shortcut-desc">Toggle imperial / metric</span><span class="shortcut-key">U</span></div>
         <div class="shortcut-row"><span class="shortcut-desc">Toggle local / UTC time</span><span class="shortcut-key">T</span></div>
         <div class="shortcut-row"><span class="shortcut-desc">Settings &amp; About</span><span class="shortcut-key">?</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Next milestone</span><span class="shortcut-key">N</span></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Previous milestone</span><span class="shortcut-key">P</span></div>
       </div>
 
       <h2 style="margin-top:16px">About</h2>
