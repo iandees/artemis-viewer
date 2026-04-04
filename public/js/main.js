@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fetchTrajectoryData, interpolate, LAUNCH_TIME } from './horizons.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { PHASES, MILESTONES, getPhaseColor, isNearMilestone, getPhaseAtMet, getNearestMilestone } from './milestones.js';
 
 // --- Constants ---
 // Scale: 1 unit = 1000 km
@@ -214,6 +218,7 @@ scene.add(orionGroup);
 
 // --- Trajectory line ---
 let orionTrailLine;
+let orionMilestoneDots = [];
 let moonTrailLine;
 
 // --- Labels (CSS-style via sprites) ---
@@ -391,6 +396,7 @@ async function init() {
     }
 
     buildTrajectoryLines();
+    buildMilestoneUI();
     createStarfield();
     frameCamera();
     elLoading.style.display = 'none';
@@ -450,19 +456,136 @@ function frameCamera() {
 }
 
 function buildTrajectoryLines() {
-  // Orion full trajectory path
-  const orionPts = data.orion.map(p => new THREE.Vector3(p.x * SCALE, p.z * SCALE, -p.y * SCALE));
-  const orionGeo = new THREE.BufferGeometry().setFromPoints(orionPts);
-  const orionMat = new THREE.LineBasicMaterial({ color: 0xff8844, transparent: true, opacity: 0.6 });
-  orionTrailLine = new THREE.Line(orionGeo, orionMat);
+  // Orion phase-colored trajectory using Line2
+  const positions = [];
+  const colors = [];
+  for (const p of data.orion) {
+    positions.push(p.x * SCALE, p.z * SCALE, -p.y * SCALE);
+    const metHrs = (p.date.getTime() - LAUNCH_TIME.getTime()) / 3600000;
+    const hex = getPhaseColor(metHrs);
+    const c = new THREE.Color(hex);
+    colors.push(c.r, c.g, c.b);
+  }
+
+  const orionGeo = new LineGeometry();
+  orionGeo.setPositions(positions);
+  orionGeo.setColors(colors);
+  const orionMat = new LineMaterial({
+    linewidth: 2,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.7,
+    resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+  });
+  orionTrailLine = new Line2(orionGeo, orionMat);
+  orionTrailLine.computeLineDistances();
   scene.add(orionTrailLine);
 
+  // Add small dots at milestone positions on the trajectory
+  const dotGeo = new THREE.SphereGeometry(0.3, 8, 6);
+  for (const ms of MILESTONES) {
+    const msTime = new Date(LAUNCH_TIME.getTime() + ms.metHrs * 3600000);
+    if (msTime < data.orion[0].date || msTime > data.orion[data.orion.length - 1].date) continue;
+
+    const state = interpolate(data.orion, msTime);
+    const pos = new THREE.Vector3(state.x * SCALE, state.z * SCALE, -state.y * SCALE);
+    const phaseColor = getPhaseColor(ms.metHrs);
+    const dotMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(phaseColor) });
+    const dot = new THREE.Mesh(dotGeo, dotMat);
+    dot.position.copy(pos);
+    scene.add(dot);
+    orionMilestoneDots.push(dot);
+  }
+
   // Moon trajectory path
-  const moonPts = data.moon.map(p => new THREE.Vector3(p.x * SCALE, p.z * SCALE, -p.y * SCALE));
-  const moonGeo = new THREE.BufferGeometry().setFromPoints(moonPts);
-  const moonMat = new THREE.LineBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.3 });
-  moonTrailLine = new THREE.Line(moonGeo, moonMat);
+  const moonPositions = [];
+  for (const p of data.moon) {
+    moonPositions.push(p.x * SCALE, p.z * SCALE, -p.y * SCALE);
+  }
+  const moonGeo = new LineGeometry();
+  moonGeo.setPositions(moonPositions);
+  const moonMat = new LineMaterial({
+    color: 0x999999,
+    linewidth: 2,
+    transparent: true,
+    opacity: 0.4,
+    resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+  });
+  moonTrailLine = new Line2(moonGeo, moonMat);
+  moonTrailLine.computeLineDistances();
   scene.add(moonTrailLine);
+}
+
+function buildMilestoneUI() {
+  const phaseBar = document.getElementById('phase-bar-container');
+  const missionStart = data.orion[0].date.getTime();
+  const missionEnd = data.orion[data.orion.length - 1].date.getTime();
+  const startMetHrs = (missionStart - LAUNCH_TIME.getTime()) / 3600000;
+  const endMetHrs = (missionEnd - LAUNCH_TIME.getTime()) / 3600000;
+
+  // Phase bar: colored segments proportional to phase duration
+  for (const phase of PHASES) {
+    const phaseStart = Math.max(phase.startHrs, startMetHrs);
+    const phaseEnd = Math.min(phase.endHrs, endMetHrs);
+    if (phaseStart >= phaseEnd) continue;
+
+    const leftPct = ((phaseStart - startMetHrs) / (endMetHrs - startMetHrs)) * 100;
+    const widthPct = ((phaseEnd - phaseStart) / (endMetHrs - startMetHrs)) * 100;
+
+    const seg = document.createElement('div');
+    seg.className = 'phase-segment';
+    seg.style.left = `${leftPct}%`;
+    seg.style.width = `${widthPct}%`;
+    seg.style.background = phase.color;
+    seg.title = phase.name;
+    phaseBar.appendChild(seg);
+  }
+
+  // Milestone ticks
+  const tickContainer = document.getElementById('milestone-ticks');
+  for (const ms of MILESTONES) {
+    if (ms.metHrs < startMetHrs || ms.metHrs > endMetHrs) continue;
+    const pct = ((ms.metHrs - startMetHrs) / (endMetHrs - startMetHrs)) * 100;
+
+    const tick = document.createElement('div');
+    tick.className = 'milestone-tick';
+    tick.style.left = `${pct}%`;
+    tick.style.background = getPhaseColor(ms.metHrs);
+
+    const label = document.createElement('div');
+    label.className = 'milestone-tick-label';
+    label.textContent = ms.name;
+    tick.appendChild(label);
+
+    tick.addEventListener('click', () => {
+      if (liveMode) setLiveMode(false);
+      const msTime = new Date(LAUNCH_TIME.getTime() + ms.metHrs * 3600000);
+      currentTime = new Date(Math.max(missionStart, Math.min(missionEnd, msTime.getTime())));
+    });
+
+    tickContainer.appendChild(tick);
+  }
+
+  // Event jump dropdown
+  const jumpSelect = document.getElementById('event-jump');
+  for (const ms of MILESTONES) {
+    if (ms.metHrs < startMetHrs || ms.metHrs > endMetHrs) continue;
+    const opt = document.createElement('option');
+    opt.value = ms.metHrs;
+    const metD = Math.floor(ms.metHrs / 24);
+    const metH = Math.floor(ms.metHrs % 24);
+    const metM = Math.round((ms.metHrs % 1) * 60);
+    opt.textContent = `${ms.name} (${metD}d ${String(metH).padStart(2, '0')}:${String(metM).padStart(2, '0')})`;
+    jumpSelect.appendChild(opt);
+  }
+  jumpSelect.addEventListener('change', () => {
+    if (!jumpSelect.value) return;
+    if (liveMode) setLiveMode(false);
+    const metHrs = parseFloat(jumpSelect.value);
+    const msTime = new Date(LAUNCH_TIME.getTime() + metHrs * 3600000);
+    currentTime = new Date(Math.max(missionStart, Math.min(missionEnd, msTime.getTime())));
+    jumpSelect.value = '';
+  });
 }
 
 function toScene(p) {
@@ -630,6 +753,25 @@ function updateScene() {
   elMetLabel.textContent = `MET: ${formatMET(met)}`;
   elSpeedDisplay.textContent = liveMode ? '' : formatPlaybackSpeed();
   document.title = `MET ${formatMET(met)} | Alt ${formatDist(altitudeKm)}`;
+
+  // Update event badge — show nearest milestone if within 5 minutes
+  const metMs = currentTime.getTime() - LAUNCH_TIME.getTime();
+  const nearest = getNearestMilestone(metMs, 1800000); // 30 minutes
+  const elEventBadge = document.getElementById('event-badge');
+  if (nearest) {
+    elEventBadge.textContent = '\u203A ' + nearest.milestone.name;
+    elEventBadge.style.color = getPhaseColor(nearest.milestone.metHrs);
+  } else {
+    elEventBadge.textContent = '';
+  }
+
+  // Update phase label
+  const currentPhase = getPhaseAtMet(metMs);
+  const elPhaseLabel = document.getElementById('phase-label');
+  if (currentPhase) {
+    elPhaseLabel.textContent = currentPhase.name;
+    elPhaseLabel.style.color = currentPhase.color;
+  }
 
   // Update extended telemetry HUD
   updateTelemetryHUD(usedLive ? liveTelemetry : null);
@@ -801,6 +943,10 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  if (orionTrailLine) {
+    orionTrailLine.material.resolution.set(window.innerWidth, window.innerHeight);
+    moonTrailLine.material.resolution.set(window.innerWidth, window.innerHeight);
+  }
 });
 
 // Keyboard shortcuts
@@ -818,6 +964,24 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '?') {
     const modal = document.getElementById('about-modal');
     modal.classList.toggle('open');
+  }
+  if (e.key === 'n' || e.key === 'N') {
+    const metHrs = (currentTime.getTime() - LAUNCH_TIME.getTime()) / 3600000;
+    const next = MILESTONES.find(ms => ms.metHrs > metHrs + 0.01);
+    if (next) {
+      if (liveMode) setLiveMode(false);
+      const msTime = new Date(LAUNCH_TIME.getTime() + next.metHrs * 3600000);
+      currentTime = new Date(Math.max(timeStart.getTime(), Math.min(timeEnd.getTime(), msTime.getTime())));
+    }
+  }
+  if (e.key === 'p' || e.key === 'P') {
+    const metHrs = (currentTime.getTime() - LAUNCH_TIME.getTime()) / 3600000;
+    const prev = [...MILESTONES].reverse().find(ms => ms.metHrs < metHrs - 0.01);
+    if (prev) {
+      if (liveMode) setLiveMode(false);
+      const msTime = new Date(LAUNCH_TIME.getTime() + prev.metHrs * 3600000);
+      currentTime = new Date(Math.max(timeStart.getTime(), Math.min(timeEnd.getTime(), msTime.getTime())));
+    }
   }
 });
 
