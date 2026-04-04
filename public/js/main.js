@@ -497,11 +497,22 @@ function buildTrajectoryLines() {
     orionMilestoneDots.push(dot);
   }
 
-  // Moon trajectory path (unchanged)
-  const moonPts = data.moon.map(p => new THREE.Vector3(p.x * SCALE, p.z * SCALE, -p.y * SCALE));
-  const moonGeo = new THREE.BufferGeometry().setFromPoints(moonPts);
-  const moonMat = new THREE.LineBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.3 });
-  moonTrailLine = new THREE.Line(moonGeo, moonMat);
+  // Moon trajectory path
+  const moonPositions = [];
+  for (const p of data.moon) {
+    moonPositions.push(p.x * SCALE, p.z * SCALE, -p.y * SCALE);
+  }
+  const moonGeo = new LineGeometry();
+  moonGeo.setPositions(moonPositions);
+  const moonMat = new LineMaterial({
+    color: 0x999999,
+    linewidth: 2,
+    transparent: true,
+    opacity: 0.4,
+    resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+  });
+  moonTrailLine = new Line2(moonGeo, moonMat);
+  moonTrailLine.computeLineDistances();
   scene.add(moonTrailLine);
 }
 
@@ -934,6 +945,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   if (orionTrailLine) {
     orionTrailLine.material.resolution.set(window.innerWidth, window.innerHeight);
+    moonTrailLine.material.resolution.set(window.innerWidth, window.innerHeight);
   }
 });
 
