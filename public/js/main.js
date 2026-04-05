@@ -673,6 +673,7 @@ function updateScene() {
   // Update object positions
   moonMesh.position.copy(moonPos);
   moonMesh.lookAt(new THREE.Vector3(0, 0, 0));
+  moonMesh.rotateY(Math.PI);
   orionGroup.position.copy(orionPos);
 
   // Rotate Earth to match reality
