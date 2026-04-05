@@ -173,6 +173,47 @@ textureLoader.load('textures/moon.jpg', (tex) => {
 const moonMesh = new THREE.Mesh(moonGeo, moonMat);
 scene.add(moonMesh);
 
+// --- Far-side easter egg ---
+const alienGroup = new THREE.Group();
+const alienMat = new THREE.MeshPhongMaterial({ color: 0x44ff44, emissive: 0x115511, emissiveIntensity: 0.3 });
+// Body
+const alienBody = new THREE.Group();
+alienBody.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.1, 4, 8), alienMat));
+// Waving arm (right side, raised)
+const armPivot = new THREE.Group();
+armPivot.position.set(0.07, 0.05, 0);
+const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.1, 4, 6), alienMat);
+arm.position.y = 0.06;
+armPivot.add(arm);
+armPivot.rotation.z = -Math.PI / 3;
+alienBody.add(armPivot);
+// Left arm (resting)
+const leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.08, 4, 6), alienMat);
+leftArm.position.set(-0.08, 0.0, 0);
+leftArm.rotation.z = Math.PI / 6;
+alienBody.add(leftArm);
+alienGroup.add(alienBody);
+// Head (separate so it can track Orion)
+const alienHead = new THREE.Group();
+const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), alienMat);
+headMesh.scale.set(1, 1.2, 1);
+alienHead.add(headMesh);
+const eyeMat = new THREE.MeshPhongMaterial({ color: 0x111111, emissive: 0x000000 });
+const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), eyeMat);
+leftEye.position.set(-0.03, 0.01, 0.06);
+alienHead.add(leftEye);
+const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), eyeMat);
+rightEye.position.set(0.03, 0.01, 0.06);
+alienHead.add(rightEye);
+alienHead.position.y = 0.14;
+alienGroup.add(alienHead);
+// Small light so it's visible in the dark
+const alienLight = new THREE.PointLight(0x88ffaa, 0.15, 1.5);
+alienLight.position.set(0, 0.3, 0);
+alienGroup.add(alienLight);
+alienGroup.visible = false;
+scene.add(alienGroup);
+
 // --- Orion spacecraft model ---
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const orionGroup = new THREE.Group();
@@ -674,6 +715,26 @@ function updateScene() {
   moonMesh.position.copy(moonPos);
   moonMesh.lookAt(new THREE.Vector3(0, 0, 0));
   moonMesh.rotateY(Math.PI);
+
+  // Easter egg: alien on the far side of the Moon
+  // Far-side direction = Moon away from Earth (moon is tidally locked)
+  const moonToEarth = new THREE.Vector3().subVectors(new THREE.Vector3(0, 0, 0), moonPos).normalize();
+  const farSideDir = moonToEarth.clone().negate();
+  // Place alien on the far-side surface, oriented "standing" on the Moon
+  const surfaceUp = farSideDir.clone();
+  alienGroup.position.copy(moonPos).addScaledVector(surfaceUp, MOON_RADIUS);
+  // Orient so local +Y = surface normal (standing upright on surface)
+  const alienQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), surfaceUp);
+  alienGroup.quaternion.copy(alienQuat);
+  // Head tracks Orion
+  const orionWorld = orionPos.clone();
+  alienHead.lookAt(alienGroup.worldToLocal(orionWorld.clone()));
+  // Wave animation
+  armPivot.rotation.z = -Math.PI / 3 + Math.sin(performance.now() * 0.005) * 0.4;
+  // Show only when Orion is on the far side
+  const moonToOrion = new THREE.Vector3().subVectors(orionPos, moonPos).normalize();
+  alienGroup.visible = moonToOrion.dot(farSideDir) > 0.3;
+
   orionGroup.position.copy(orionPos);
 
   // Rotate Earth to match reality
