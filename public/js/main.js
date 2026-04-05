@@ -12,10 +12,21 @@ const SCALE = 1 / 1000;
 const EARTH_RADIUS = 6371 * SCALE;
 const MOON_RADIUS = 1737 * SCALE;
 
+// --- Reusable temp objects (avoid per-frame allocations) ---
+const _v0 = new THREE.Vector3();
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _q0 = new THREE.Quaternion();
+const _origin = new THREE.Vector3(0, 0, 0);
+const _up = new THREE.Vector3(0, 1, 0);
+const _forward = new THREE.Vector3(1, 0, 0);
+let needsRender = true;
+
 // --- Scene setup ---
 const canvas = document.getElementById('canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
@@ -30,9 +41,11 @@ controls.minDistance = 1;
 controls.maxDistance = 5000;
 controls.addEventListener('start', () => {
   focusTarget = 'free';
+  needsRender = true;
   document.querySelectorAll('#focus-btns .btn').forEach(b => b.classList.remove('active'));
   document.getElementById('focus-free').classList.add('active');
 });
+controls.addEventListener('change', () => { needsRender = true; });
 
 // --- Lighting ---
 const ambientLight = new THREE.AmbientLight(0x222244, 0.3);
@@ -125,7 +138,7 @@ async function createStarfield() {
 const textureLoader = new THREE.TextureLoader();
 
 // --- Earth ---
-const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
+const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 32, 32);
 const earthMat = new THREE.MeshPhongMaterial({
   color: 0x2244aa,
   emissive: 0x112244,
@@ -147,7 +160,7 @@ const earthMesh = new THREE.Mesh(earthGeo, earthMat);
 scene.add(earthMesh);
 
 // Earth atmosphere glow
-const glowGeo = new THREE.SphereGeometry(EARTH_RADIUS * 1.03, 64, 64);
+const glowGeo = new THREE.SphereGeometry(EARTH_RADIUS * 1.03, 24, 24);
 const glowMat = new THREE.MeshBasicMaterial({
   color: 0x4488ff,
   transparent: true,
@@ -602,6 +615,7 @@ function buildMilestoneUI() {
       if (liveMode) setLiveMode(false);
       const msTime = new Date(LAUNCH_TIME.getTime() + ms.metHrs * 3600000);
       currentTime = new Date(Math.max(missionStart, Math.min(missionEnd, msTime.getTime())));
+      needsRender = true;
     });
 
     tickContainer.appendChild(tick);
@@ -625,6 +639,7 @@ function buildMilestoneUI() {
     const metHrs = parseFloat(jumpSelect.value);
     const msTime = new Date(LAUNCH_TIME.getTime() + metHrs * 3600000);
     currentTime = new Date(Math.max(missionStart, Math.min(missionEnd, msTime.getTime())));
+    needsRender = true;
     jumpSelect.value = '';
   });
 }
@@ -713,27 +728,26 @@ function updateScene() {
 
   // Update object positions
   moonMesh.position.copy(moonPos);
-  moonMesh.lookAt(new THREE.Vector3(0, 0, 0));
+  moonMesh.lookAt(_origin);
   moonMesh.rotateY(Math.PI);
 
   // Easter egg: alien on the far side of the Moon
   // Far-side direction = Moon away from Earth (moon is tidally locked)
-  const moonToEarth = new THREE.Vector3().subVectors(new THREE.Vector3(0, 0, 0), moonPos).normalize();
-  const farSideDir = moonToEarth.clone().negate();
+  _v0.copy(_origin).sub(moonPos).normalize(); // moonToEarth
+  _v1.copy(_v0).negate(); // farSideDir
   // Place alien on the far-side surface, oriented "standing" on the Moon
-  const surfaceUp = farSideDir.clone();
-  alienGroup.position.copy(moonPos).addScaledVector(surfaceUp, MOON_RADIUS);
+  alienGroup.position.copy(moonPos).addScaledVector(_v1, MOON_RADIUS);
   // Orient so local +Y = surface normal (standing upright on surface)
-  const alienQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), surfaceUp);
-  alienGroup.quaternion.copy(alienQuat);
+  _q0.setFromUnitVectors(_up, _v1);
+  alienGroup.quaternion.copy(_q0);
   // Head tracks Orion
-  const orionWorld = orionPos.clone();
-  alienHead.lookAt(alienGroup.worldToLocal(orionWorld.clone()));
+  _v2.copy(orionPos);
+  alienHead.lookAt(alienGroup.worldToLocal(_v2));
   // Wave animation
   armPivot.rotation.z = -Math.PI / 3 + Math.sin(performance.now() * 0.005) * 0.4;
   // Show only when Orion is on the far side
-  const moonToOrion = new THREE.Vector3().subVectors(orionPos, moonPos).normalize();
-  alienGroup.visible = moonToOrion.dot(farSideDir) > 0.3;
+  _v2.subVectors(orionPos, moonPos).normalize();
+  alienGroup.visible = _v2.dot(_v1) > 0.3;
 
   orionGroup.position.copy(orionPos);
 
@@ -752,22 +766,20 @@ function updateScene() {
     orionGroup.quaternion.set(orionState.qx, orionState.qz, -orionState.qy, orionState.qw);
   } else {
     // Fallback: point nose (+X in body frame) along velocity
-    const velDir = new THREE.Vector3(orionState.vx, orionState.vz, -orionState.vy).normalize();
-    const forward = new THREE.Vector3(1, 0, 0);
-    const quat = new THREE.Quaternion().setFromUnitVectors(forward, velDir);
-    orionGroup.quaternion.copy(quat);
+    _v0.set(orionState.vx, orionState.vz, -orionState.vy).normalize();
+    _q0.setFromUnitVectors(_forward, _v0);
+    orionGroup.quaternion.copy(_q0);
   }
 
   // Sun direction (placed at visual distance, not to scale)
   const sunDir = toScene(sunState).normalize();
-  const sunPos = sunDir.clone().multiplyScalar(SUN_VISUAL_DIST);
-  sunSprite.position.copy(sunPos);
-  sunLabel.position.copy(sunDir.clone().multiplyScalar(SUN_VISUAL_DIST * 0.95)).add(new THREE.Vector3(0, 40, 0));
-  sunLight.position.copy(sunDir.clone().multiplyScalar(500));
+  sunSprite.position.copy(sunDir).multiplyScalar(SUN_VISUAL_DIST);
+  sunLabel.position.copy(sunDir).multiplyScalar(SUN_VISUAL_DIST * 0.95).add(_v0.set(0, 40, 0));
+  sunLight.position.copy(sunDir).multiplyScalar(500);
 
   // Labels follow objects
-  moonLabel.position.copy(moonPos).add(new THREE.Vector3(0, MOON_RADIUS + 5, 0));
-  orionLabel.position.copy(orionPos).add(new THREE.Vector3(0, 4, 0));
+  moonLabel.position.copy(moonPos).add(_v0.set(0, MOON_RADIUS + 5, 0));
+  orionLabel.position.copy(orionPos).add(_v0.set(0, 4, 0));
 
   // Scale orion marker based on camera distance
   const camDist = camera.position.distanceTo(orionPos);
@@ -781,7 +793,7 @@ function updateScene() {
   } else if (focusTarget === 'moon') {
     controls.target.lerp(moonPos, 0.05);
   } else if (focusTarget === 'earth') {
-    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+    controls.target.lerp(_origin, 0.05);
   }
 
   // Update HUD
@@ -920,6 +932,7 @@ function animate() {
   if (liveMode) {
     updateLiveTime();
     pollTelemetry(); // non-blocking, rate-limited to every 2s
+    needsRender = true;
   } else if (playing && lastRealTime) {
     const dtReal = (now - lastRealTime) / 1000;
     const dtMission = dtReal * speedMultiplier * 1000;
@@ -928,11 +941,20 @@ function animate() {
       playing = false;
       elBtnPlay.textContent = '\u25B6 Play';
     }
+    needsRender = true;
   }
   lastRealTime = now;
 
-  updateScene();
+  // Always update controls (damping triggers 'change' event which sets needsRender)
   controls.update();
+
+  // Skip expensive rendering when nothing has changed
+  // Always render when tracking a target (camera lerp needs continuous frames)
+  if (focusTarget !== 'free') needsRender = true;
+  if (!needsRender) return;
+  needsRender = false;
+
+  updateScene();
   renderer.render(scene, camera);
 }
 
@@ -942,6 +964,7 @@ elBtnPlay.addEventListener('click', () => {
   playing = !playing;
   elBtnPlay.textContent = playing ? '\u23F8 Pause' : '\u25B6 Play';
   if (playing) lastRealTime = performance.now();
+  needsRender = true;
 });
 
 document.getElementById('btn-live').addEventListener('click', () => {
@@ -978,12 +1001,14 @@ elTimeline.addEventListener('input', () => {
   if (liveMode) setLiveMode(false);
   const frac = parseInt(elTimeline.value) / 1000;
   currentTime = new Date(timeStart.getTime() + frac * (timeEnd.getTime() - timeStart.getTime()));
+  needsRender = true;
 });
 
 // Focus buttons
 ['earth', 'orion', 'moon', 'free'].forEach(target => {
   document.getElementById(`focus-${target}`).addEventListener('click', () => {
     focusTarget = target;
+    needsRender = true;
     document.querySelectorAll('#focus-btns .btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`focus-${target}`).classList.add('active');
   });
@@ -1010,6 +1035,7 @@ window.addEventListener('resize', () => {
     orionTrailLine.material.resolution.set(window.innerWidth, window.innerHeight);
     moonTrailLine.material.resolution.set(window.innerWidth, window.innerHeight);
   }
+  needsRender = true;
 });
 
 // Keyboard shortcuts
@@ -1035,6 +1061,7 @@ window.addEventListener('keydown', (e) => {
       if (liveMode) setLiveMode(false);
       const msTime = new Date(LAUNCH_TIME.getTime() + next.metHrs * 3600000);
       currentTime = new Date(Math.max(timeStart.getTime(), Math.min(timeEnd.getTime(), msTime.getTime())));
+      needsRender = true;
     }
   }
   if (e.key === 'p' || e.key === 'P') {
@@ -1044,6 +1071,7 @@ window.addEventListener('keydown', (e) => {
       if (liveMode) setLiveMode(false);
       const msTime = new Date(LAUNCH_TIME.getTime() + prev.metHrs * 3600000);
       currentTime = new Date(Math.max(timeStart.getTime(), Math.min(timeEnd.getTime(), msTime.getTime())));
+      needsRender = true;
     }
   }
 });
