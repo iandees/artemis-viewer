@@ -19,6 +19,11 @@ const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
 const _q0 = new THREE.Quaternion();
 const _origin = new THREE.Vector3(0, 0, 0);
+// orion state at max distance
+// x: -133683.65588711537
+// y: -340739.71055814304
+// z: -187913.97695150267
+const _system = new THREE.Vector3(-133683/2, -340739/2, -187913/2);
 const _up = new THREE.Vector3(0, 1, 0);
 const _forward = new THREE.Vector3(1, 0, 0);
 let needsRender = true;
@@ -794,6 +799,8 @@ function updateScene() {
     controls.target.lerp(moonPos, 0.05);
   } else if (focusTarget === 'earth') {
     controls.target.lerp(_origin, 0.05);
+  } else if (focusTarget === 'system') {
+    controls.target.lerp(_system, 0.05);
   }
 
   // Update HUD
@@ -1005,7 +1012,7 @@ elTimeline.addEventListener('input', () => {
 });
 
 // Focus buttons
-['earth', 'orion', 'moon', 'free'].forEach(target => {
+['earth', 'orion', 'moon', 'free', 'system'].forEach(target => {
   document.getElementById(`focus-${target}`).addEventListener('click', () => {
     focusTarget = target;
     needsRender = true;
@@ -1047,6 +1054,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '2') document.getElementById('focus-orion').click();
   if (e.key === '3') document.getElementById('focus-moon').click();
   if (e.key === '4') document.getElementById('focus-free').click();
+  if (e.key === '5') document.getElementById('focus-system').click();
   if (e.key === 'l' || e.key === 'L') document.getElementById('btn-live').click();
   if (e.key === 'u' || e.key === 'U') document.getElementById('btn-units').click();
   if (e.key === 't' || e.key === 'T') document.getElementById('btn-tz').click();
